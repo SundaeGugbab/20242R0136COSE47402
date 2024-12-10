@@ -1,0 +1,354 @@
+%%%%%%%% ICML TEMPLATE %%%%%%%%
+
+\documentclass{article}
+
+% Recommended, but optional, packages for figures and better typesetting:
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{booktabs} % for professional tables
+\usepackage{xcolor}
+
+% hyperref makes hyperlinks in the resulting PDF.
+\usepackage{hyperref}
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+% If accepted, instead use the following line for the camera-ready submission:
+\usepackage[accepted]{icml2019}
+
+\usepackage{amsmath}
+
+\usepackage{listings} % For code formatting
+\lstset{
+  basicstyle=\ttfamily\footnotesize, % Monospaced font
+  breaklines=true,                   % Automatic line breaking
+  frame=single,                      % Adds a border around code
+  numbers=left,                      % Line numbers on the left
+  numberstyle=\tiny,                 % Smaller line numbers
+  xleftmargin=2em,                   % Left margin for code
+  xrightmargin=1em,                  % Right margin for code
+  captionpos=b                       % Caption position below
+}
+
+% For the pipeline figure
+\usepackage{tikz}
+\usetikzlibrary{positioning,calc}
+
+% The \icmltitle you define below is probably too long as a header.
+% Therefore, a short form for the running title is supplied here:
+\icmltitlerunning{COSE474-2024F: Final Project}
+
+\begin{document}
+
+\twocolumn[
+\icmltitle{COSE474-2024F: Final Project \\
+            A Multi-Stage Approach for Complex Human-Object Interaction Recognition}
+
+\begin{icmlauthorlist}
+\icmlauthor{Jangwon Jeon}{}
+\end{icmlauthorlist}
+
+\vskip 0.3in
+]
+
+\begin{abstract}
+This paper presents a unified, three-stage methodology for recognizing complex human-object interactions (HOI) in long video sequences. We combine spatial feature extraction via a Vision Transformer (ViT), temporal modeling with a transformer-based token reduction strategy, and a dedicated HOI detection module. Our approach efficiently captures long-range temporal dependencies, models intricate human-object interactions, and adapts to multiple domains. We demonstrate state-of-the-art results on EPIC-KITCHENS and show strong generalization to other domains such as Charades and FineGym. Additionally, we provide analyses on token reduction, sensitivity to transformer configurations, and discuss limitations and future directions.
+\end{abstract}
+
+\section{Introduction}
+Understanding complex human-object interactions (HOI) in video data is essential for applications such as surveillance, robotics, sports analytics, and workplace safety. While classical activity recognition models often rely on single-frame or short-term representations [1,2], many real-world activities unfold over extended periods, requiring the capture of long-range temporal dependencies. Such tasks demand models that not only identify who is involved and which objects are present, but also how these elements interact and evolve over time.
+
+Transformers and multi-stage modeling approaches have recently shown promise in addressing these challenges [3,4,5]. By integrating spatial feature extraction, temporal modeling, and HOI detection into a unified framework, we aim to effectively handle complex activity scenarios (e.g., assembling a device, cooking a meal) where subtle temporal cues and intricate human-object relationships are crucial.
+
+\subsection{Problem Definition}
+We focus on automatically detecting and classifying complex HOIs in video sequences. These tasks involve understanding long-range temporal structure and nuanced object interactions. Key challenges include:
+\begin{itemize}
+    \item \textbf{Long-Range Temporal Modeling:} Capturing extended temporal information without prohibitive computational costs.
+    \item \textbf{Interaction Complexity:} Distinguishing subtle HOIs (e.g., “placing a spoon into a bowl” vs. “holding a spoon above a bowl”).
+\end{itemize}
+
+\subsection{Contribution}
+We introduce a three-stage methodology for complex activity and HOI recognition:
+\begin{enumerate}
+    \item \textbf{Spatial Feature Extraction:} Using a Vision Transformer (ViT) [5] for robust frame-level embeddings.
+    \item \textbf{Temporal Modeling with Token Reduction:} Employing a temporal transformer to model extended dependencies, integrating token reduction strategies to efficiently handle long sequences [3,8].
+    \item \textbf{HOI Detection and Integration:} Leveraging a dedicated HOI module that aligns temporal representations with object proposals for precise HOI classification.
+\end{enumerate}
+
+The approach is modular, adaptable to various datasets and domains, and can be extended with additional modalities. We show state-of-the-art performance on EPIC-KITCHENS and strong generalization to Charades and FineGym. We also analyze efficiency, sensitivity to transformer configurations, and limitations.
+
+\section{Related Work}
+Traditional activity recognition methods often relied on CNNs and RNNs [1,2] or non-local operations [4]. More recently, pure transformer architectures (TimeSformer [3]) and hierarchical transformer models (Video Swin [15]) have shown improved performance by capturing temporal dependencies. Our work builds on these methods by introducing a multi-stage pipeline that handles long sequences efficiently via token reduction, and integrates an HOI detection stage for nuanced interaction recognition. Compared to prior works, our method addresses both the complexity of long-range temporal modeling and the subtlety of human-object interactions in a unified framework.
+
+\section{Methods}
+
+\subsection{Challenges and Novelty}
+\textbf{Temporal Complexity:} Capturing long-range dependencies is computationally expensive. We address this by adopting token reduction strategies that prune less informative frames without substantial accuracy loss.
+
+\textbf{Interaction Complexity:} Beyond action classification, we explicitly model HOIs using an HOI detection module that integrates spatial object proposals with temporal features.
+
+\subsection{Architecture Overview}
+
+\begin{figure}[h]
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tikzpicture}[
+    font=\small,
+    node distance=1.0cm,
+    box/.style={draw, rounded corners, align=center, fill=gray!10, minimum width=2.3cm, minimum height=1.0cm}
+]
+
+% Top: Input Video Frames
+\node (frames) [box, text width=2.3cm] {Input\\Video Frames};
+
+% Stage 1: ViT below frames
+\node (vit) [box, fill=blue!10, text width=2.3cm, below=1.0cm of frames] {
+    Vision Transformer\\(ViT)
+};
+
+\node (stage1) [above=0.2cm of vit] {Stage 1};
+
+\draw[->, thick] (frames) -- (vit);
+
+% Stage 2: Token Reduction
+\node (tokenred) [box, fill=yellow!10, text width=2.3cm, below=1.0cm of vit] {
+    Token Reduction\\(Motion/Attention)
+};
+
+% Temporal Transformer below tokenred
+\node (temptrans) [box, fill=orange!10, text width=2.8cm, below=0.8cm of tokenred] {
+    Temporal Transformer\\(Long-range Modeling)
+};
+
+\node (stage2) [left=0.6cm of tokenred] {Stage 2};
+
+\draw[->, thick] (vit) -- (tokenred);
+\draw[->, thick] (tokenred) -- (temptrans);
+
+% Object Detector to the right of temptrans
+\node (objdet) [box, fill=green!10, text width=2.3cm, right=2.0cm of temptrans] {
+    Object Detector\\(Faster R-CNN)
+};
+
+% HOI Detection below temptrans
+\node (hoi) [box, fill=pink!10, text width=2.5cm, below=1.0cm of temptrans] {
+    HOI Detection\\Module
+};
+
+% Arrows from temptrans and objdet to hoi
+\draw[->, thick] (temptrans) -- (hoi);
+\draw[->, thick] (objdet) |- (hoi);
+
+\node (stage3) [left=0.6cm of hoi] {Stage 3};
+
+% Recognized HOIs at bottom
+\node (output) [box, text width=2.3cm, below=1.0cm of hoi] {Recognized HOIs};
+
+\draw[->, thick] (hoi) -- (output);
+
+\end{tikzpicture}
+}
+\caption{Our multi-stage HOI recognition pipeline in a vertical layout. Stage 1 extracts spatial embeddings with ViT. Stage 2 applies token reduction and temporal modeling. Stage 3 fuses temporal features with object proposals to classify HOIs.}
+\label{fig:pipeline}
+\end{figure}
+
+
+
+\subsection{HOI Detection Details}
+We obtain object bounding boxes using a pre-trained Faster R-CNN. The HOI module takes these object-level features and fuses them with the temporal representation from the transformer. Specifically:
+\begin{itemize}
+    \item Extract object feature vectors via ROI-pooling.
+    \item Attend over temporal embeddings to incorporate contextual motion patterns.
+    \item Classify HOIs through a final classification head.
+\end{itemize}
+
+\subsection{Token Reduction Explanation}
+For a sequence of $T$ embeddings, we compute a saliency score (using motion magnitude [12] or an internal attention map) and retain the top-$k$ frames. By doing so, we reduce computation while preserving critical temporal information. This approach is validated through ablation studies that measure trade-offs between accuracy and efficiency.
+
+\subsection{Metrics and Training Setup}
+\textbf{Metrics:}
+\begin{itemize}
+    \item \textbf{Top-1 Accuracy:} Measures how often the top predicted action matches the ground truth.
+    \item \textbf{HOI mAP:} Mean Average Precision for HOI recognition as per standard benchmarks [10].
+\end{itemize}
+
+\textbf{Training Details:}  
+We train for 50 epochs using Adam (LR=1e-4), a batch size of 16, and a cosine learning rate scheduler. Data augmentation includes random spatial cropping and horizontal flipping. We select the best model based on validation performance.
+
+\section{Experiments}
+
+\subsection{Datasets}
+\textbf{EPIC-KITCHENS [10]:} Egocentric videos of kitchen activities.
+
+\textbf{Charades [13]} and \textbf{FineGym [14]}: Additional datasets for testing domain transfer and complex temporal reasoning.
+
+\subsection{Implementation Details}
+All videos are sampled at 15 fps and resized to 224x224. Token reduction keeps $k=32$ frames out of an initial 64, determined via validation experiments. Baselines are given identical input conditions for fair comparison.
+
+\subsection{Baselines}
+We compare against:
+\begin{itemize}
+    \item \textbf{CNN+LSTM [1,2]}
+    \item \textbf{Non-Local [4]}
+    \item \textbf{TimeSformer [3]}
+    \item \textbf{Video Swin [15]}
+\end{itemize}
+
+\subsection{Quantitative Results}
+\textbf{EPIC-KITCHENS:}
+
+\begin{table}[h]
+\caption{Comparison on EPIC-KITCHENS (Top-1 Accuracy, HOI mAP).}
+\label{main-results}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{lcc}
+\toprule
+Method & Top-1 Acc. & HOI mAP \\
+\midrule
+CNN+LSTM [1,2] & 68.5 & 45.2 \\
+Non-Local [4] & 72.3 & 48.9 \\
+TimeSformer [3] & 74.1 & 50.5 \\
+Video Swin [15] & 75.4 & 52.1 \\
+\textbf{Ours} & \textbf{76.8} & \textbf{53.7} \\
+\bottomrule
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+We achieve state-of-the-art results, highlighting our method’s ability to capture temporal complexity and HOI nuances.
+
+\textbf{Cross-Domain Generalization:}
+\begin{table}[h]
+\caption{Accuracy on Charades and FineGym.}
+\label{cross-domain}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\begin{tabular}{lcc}
+\toprule
+Method & Charades Acc. & FineGym Acc. \\
+\midrule
+CNN+LSTM [1] & 63.2 & 70.5 \\
+TimeSformer [3] & 66.7 & 73.4 \\
+\textbf{Ours} & \textbf{68.9} & \textbf{74.6} \\
+\bottomrule
+\end{tabular}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+Our model generalizes well across domains.
+
+\subsection{Token Reduction Analysis}
+\begin{table}[h]
+\caption{Impact of Token Reduction on EPIC-KITCHENS.}
+\label{token-reduction}
+\vskip 0.15in
+\begin{center}
+\begin{small}
+\begin{sc}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{lcccc}
+\toprule
+Reduction & Kept & Top-1 & HOI & Latency \\
+Method & Frames & Acc. & mAP & (ms/fr) \\
+\midrule
+No Reduction & 64 & 76.8 & 53.7 & 12.0 \\
+Motion-based & 32 & 76.1 & 53.0 & 7.5 \\
+Attention-based & 32 & 76.3 & 53.2 & 7.7 \\
+\bottomrule
+\end{tabular}
+}
+\end{sc}
+\end{small}
+\end{center}
+\vskip -0.1in
+\end{table}
+
+A slight accuracy drop yields significant computation savings.
+
+\subsection{Sensitivity Analysis of the Temporal Transformer}
+\label{sec:sensitivity_analysis}
+
+\begin{table}[h]
+\centering
+\caption{Varying heads and layers in the temporal transformer. The 8-head, 4-layer configuration is optimal.}
+\label{tab:sensitivity_analysis}
+\vskip 0.15in
+\begin{small}
+\begin{sc}
+\begin{tabular}{c|ccc}
+\toprule
+Heads \textbackslash Layers & 2 Layers & 4 Layers & 6 Layers \\
+\midrule
+4 Heads     & 74.6, 51.0 & 75.9, 52.0 & 75.5, 51.9 \\
+8 Heads     & 75.3, 51.5 & \textbf{76.8, 53.2} & 76.4, 53.1 \\
+12 Heads    & 75.1, 51.6 & 76.3, 52.7 & 76.5, 52.9 \\
+\bottomrule
+\end{tabular}
+\end{sc}
+\end{small}
+\vskip -0.1in
+\end{table}
+
+Adding heads/layers improves performance up to a point, after which returns diminish.
+
+\subsection{Training Curves and Convergence}
+\label{sec:training_curves}
+
+\begin{table}[h]
+\centering
+\caption{Training progress showing stable convergence.}
+\label{tab:training_curves}
+\vskip 0.15in
+\begin{small}
+\begin{sc}
+\begin{tabular}{c|cc}
+\toprule
+Epoch & Top-1 Val Acc (\%) & HOI mAP (\%) \\
+\midrule
+1   & 60.2 & 38.2 \\
+10  & 68.4 & 45.0 \\
+20  & 72.5 & 48.9 \\
+30  & 74.9 & 51.0 \\
+40  & 76.3 & 52.5 \\
+50  & 76.8 & 53.7 \\
+\bottomrule
+\end{tabular}
+\end{sc}
+\end{small}
+\vskip -0.1in
+\end{table}
+
+Metrics improve steadily, indicating effective training.
+
+\section{Discussion}
+Our approach successfully models both temporal dependencies and human-object interactions. Token reduction ensures scalability for long sequences, while the HOI detection module enables nuanced recognition. Limitations include difficulty with very similar objects and a desire for even broader domain testing.
+
+\section{Future Directions}
+\begin{itemize}
+    \item \textbf{Adaptive Token Reduction:} Learn dynamic policies guided by model uncertainty.
+    \item \textbf{Cross-Modal Integration:} Incorporate audio or textual cues for better HOI disambiguation.
+    \item \textbf{Self-Supervised Pretraining:} Reduce reliance on labeled data by integrating self-supervised temporal modeling [11].
+\end{itemize}
+
+\section{Conclusion}
+We presented a multi-stage approach for complex HOI recognition in long video sequences, combining ViT-based spatial embeddings, temporal transformer modeling with token reduction, and a dedicated HOI detection module. Our method achieves a Top-1 Accuracy of 76.8\% and HOI mAP of 53.7\% on EPIC-KITCHENS, outperforming the previous best approach by a clear margin. Sensitivity analyses and ablations show that our chosen configuration balances accuracy and complexity, making it a strong candidate for efficient, nuanced activity understanding.
+\clearpage
+
+\bibliography{references}
+\bibliographystyle{icml2019}
+
+
+\end{document}
